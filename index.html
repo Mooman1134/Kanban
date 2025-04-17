@@ -1,3 +1,4 @@
+<!-- Save this file as <strong>index.html</strong> in your GitHub Pages repo root -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +7,7 @@
   <title>Kanban Tracker: Tasks, Books & Shows</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Canvas Confetti -->
+  <!-- Canvas Confetti (global) -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.4.0/dist/confetti.browser.min.js"></script>
 </head>
 <body class="min-h-screen bg-gray-900 text-white p-6">
@@ -40,17 +41,14 @@
     </section>
   </template>
 
-  <div id="containers">
-    <!-- Boards will be injected here -->
-  </div>
+  <div id="containers"><!-- Boards will be injected here --></div>
 
-  <!-- Use ES Modules to import Firebase -->
+  <!-- ES Modules for Firebase + Debug Logging -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
     import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js';
-    import { getAnalytics } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics.js';
 
-    // Your web app's Firebase configuration
+    // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyD-pE3e0z1HTgFskxk1HvItLA71RKi-rag",
       authDomain: "todo-list-d9910.firebaseapp.com",
@@ -64,10 +62,8 @@
 
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
     const db = getDatabase(app);
 
-    // In-memory stores
     const stores = { tasks: [], books: [], shows: [] };
     const config = [
       { key: 'tasks', title: 'Tasks', colors: ['border-fuchsia-500','border-yellow-500','border-cyan-500'] },
@@ -79,7 +75,9 @@
     const template = document.getElementById('kanban-template');
 
     function saveStore(key) {
-      set(ref(db, key), stores[key]);
+      set(ref(db, key), stores[key])
+        .then(() => console.log(`Saved ${key}:`, stores[key]))
+        .catch(err => console.error(`Error saving ${key}:`, err));
     }
 
     function createBoard({ key, title, colors }) {
@@ -94,6 +92,7 @@
       cols.forEach((col, i) => col.classList.add(colors[i]));
 
       function render() {
+        console.log(`Rendering ${key}:`, stores[key]);
         cols.forEach(col => col.querySelector('.board-col').innerHTML = '');
         stores[key].forEach(item => {
           const card = document.createElement('div');
@@ -118,11 +117,12 @@
         });
       }
 
-      // Sync from Firebase
+      // Listen for changes in Firebase
       onValue(ref(db, key), snapshot => {
         stores[key] = snapshot.val() || [];
+        console.log(`Fetched ${key}:`, stores[key]);
         render();
-      });
+      }, err => console.error(`Error fetching ${key}:`, err));
 
       form.addEventListener('submit', e => {
         e.preventDefault();
@@ -143,7 +143,7 @@
             item.status = col.dataset.status;
             saveStore(key);
             if (col.dataset.status === 'done') {
-              confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+              window.confetti?.({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
             }
           }
         });
