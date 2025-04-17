@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban Tracker: Tasks, Books & Shows</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.4.0/dist/confetti.browser.min.js"></script>
+</head>
+<body class="min-h-screen bg-gray-900 text-white p-6">
+  <header class="mb-8 text-center">
+    <h1 class="text-4xl font-bold">Kanban Tracker</h1>
+    <p class="text-gray-400">Manage Tasks, Books & Shows</p>
+  </header>
+
+  <!-- Generic Kanban Section Template -->
+  <template id="kanban-template">
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold mb-4"></h2>
+      <form class="kanban-form flex gap-2 mb-4">
+        <input type="text" placeholder="Add item..." required class="flex-grow p-2 rounded bg-gray-800 placeholder-gray-400 focus:outline-none" />
+        <button type="submit" class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Add</button>
+      </form>
+      <div class="kanban-board grid grid-cols-3 gap-4">
+        <div class="bg-gray-800 rounded p-4 border-t-4" data-status="todo">
+          <h3 class="text-lg mb-2">To Do</h3>
+          <div class="board-col flex flex-col gap-2 min-h-[150px]"></div>
+        </div>
+        <div class="bg-gray-800 rounded p-4 border-t-4" data-status="in-progress">
+          <h3 class="text-lg mb-2">In Progress</h3>
+          <div class="board-col flex flex-col gap-2 min-h-[150px]"></div>
+        </div>
+        <div class="bg-gray-800 rounded p-4 border-t-4" data-status="done">
+          <h3 class="text-lg mb-2">Done</h3>
+          <div class="board-col flex flex-col gap-2 min-h-[150px]"></div>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <div id="containers">
+    <!-- Tasks will be injected here -->
+  </div>
+
+  <script>
+    // Data stores
+    const stores = {
+      tasks: JSON.parse(localStorage.getItem('tasksBoard')) || [],
+      books: JSON.parse(localStorage.getItem('booksBoard')) || [],
+      shows: JSON.parse(localStorage.getItem('showsBoard')) || []
+    };
+
+    const config = [
+      { key: 'tasks', title: 'Tasks', colors: ['border-fuchsia-500','border-yellow-500','border-cyan-500'] },
+      { key: 'books', title: 'Books to Read', colors: ['border-green-500','border-yellow-500','border-green-300'], statuses: ['To Read','Reading','Read'] },
+      { key: 'shows', title: 'Shows to Watch', colors: ['border-indigo-500','border-yellow-500','border-indigo-300'], statuses: ['To Watch','Watching','Watched'] }
+    ];
+
+    const container = document.getElementById('containers');
+    const template = document.getElementById('kanban-template');
+
+    function saveStore(key) {
+      localStorage.setItem(key + 'Board', JSON.stringify(stores[key]));
+    }
+
+    function createBoard({ key, title, colors, statuses }) {
+      const clone = template.content.cloneNode(true);
+      const section = clone.querySelector('section');
+      section.querySelector('h2').textContent = title;
+      const form = section.querySelector('form');
+      const input = form.querySelector('input');
+      const button = form.querySelector('button');
+      form.classList.add(key + '-form');
+
+      // Set column headers & colors
+      const cols = Array.from(section.querySelectorAll('[data-status]'));
+      cols.forEach((col, i) => {
+        col.classList.add(colors[i]);
+        const status = statuses ? statuses[i] : ['To Do','In Progress','Done'][i];
+        col.querySelector('h3').textContent = status;
+        // tag board-col for rendering
+      });
+
+      // Render items
+      function render() {
+        cols.forEach(col => col.querySelector('.board-col').innerHTML = '');
+        stores[key].forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'bg-gray-700 p-2 rounded flex justify-between items-center cursor-move';
+          card.draggable = true;
+          card.dataset.id = item.id;
+          card.textContent = item.text;
+
+          const del = document.createElement('button');
+          del.textContent = 'X';
+          del.className = 'ml-2 text-red-500 hover:text-red-400';
+          del.addEventListener('click', () => {
+            stores[key] = stores[key].filter(x => x.id !== item.id);
+            saveStore(key); render();
+          });
+          card.append(del);
+
+          card.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', item.id));
+
+          const col = cols.find(c => c.dataset.status === item.status);
+          col.querySelector('.board-col').append(card);
+        });
+      }
+
+      // Form submit
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        stores[key].push({ id: Date.now().toString(), text: input.value.trim(), status: 'todo' });
+        saveStore(key); render(); input.value = '';
+      });
+
+      // Drag & drop
+      cols.forEach(col => {
+        col.addEventListener('dragover', e => e.preventDefault());
+        col.addEventListener('drop', e => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData('text/plain');
+          const item = stores[key].find(x => x.id === id);
+          if (item && item.status !== col.dataset.status) {
+            item.status = col.dataset.status;
+            saveStore(key); render();
+            if (col.dataset.status === 'done') confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+          }
+        });
+      });
+
+      render();
+      container.append(section);
+    }
+
+    // Initialize boards
+    config.forEach(cfg => createBoard(cfg));
+  </script>
+</body>
+</html>
